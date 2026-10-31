@@ -14,7 +14,11 @@ export const useCustomFilters = (chores, membersData, labels, projects) => {
   const { data: userProfile } = useUserProfile()
 
   // React Query hooks
-  const { data: filtersData = [] } = useFilters()
+  const {
+    data: filtersData = [],
+    status: filtersStatus,
+    fetchStatus: filtersFetchStatus,
+  } = useFilters()
   const createFilterMutation = useCreateFilter()
   const updateFilterMutation = useUpdateFilter()
   const deleteFilterMutation = useDeleteFilter()
@@ -260,6 +264,8 @@ export const useCustomFilters = (chores, membersData, labels, projects) => {
 
   return {
     savedFilters: filtersWithCounts,
+    filtersStatus,
+    filtersFetchStatus,
     activeFilter,
     activeFilterId,
     tempFilter,

@@ -46,6 +46,7 @@ import {
 } from '../../utils/Chores'
 import Priorities from '../../utils/Priorities'
 import { getSafeBottom } from '../../utils/SafeAreaUtils.js'
+import { advanceSavedFilterNavigation } from '../../utils/SavedFilterNavigation'
 import TaskInput from '../components/AddTaskModal'
 import CalendarDual from '../components/CalendarDual'
 import CalendarMonthly from '../components/CalendarMonthly.jsx'
@@ -181,6 +182,7 @@ const MyChores = () => {
   // Last `filterId` we saw in the URL, so the URL → filter-state effect can tell
   // a real URL change from its own write-back.
   const lastUrlFilterIdRef = useRef(null)
+  const savedFilterNavigationRef = useRef({ rawFilterId: null, pending: null })
   // While an incoming deep link is being applied, the existing temp filter is
   // stale for one render. Keep its URL-sync effect from writing that old value
   // back over the new deep link and causing the two filters to oscillate.
@@ -252,6 +254,8 @@ const MyChores = () => {
     deleteFilter,
     filteredChores: customFilteredChores,
     hasFilterApplied,
+    filtersStatus,
+    filtersFetchStatus,
     pinFilter,
     saveFilter,
     savedFilters,
@@ -680,6 +684,18 @@ const MyChores = () => {
     // makes the two effects fight and flip between the old and new insight.
     const urlFilterIdChanged = lastUrlFilterIdRef.current !== rawFilterId
     lastUrlFilterIdRef.current = rawFilterId
+    const savedNavigation = advanceSavedFilterNavigation(
+      savedFilterNavigationRef.current,
+      {
+        activeFilterId,
+        filtersStatus,
+        filtersFetchStatus,
+        rawFilterId,
+        savedFilters,
+        tempFilter,
+      },
+    )
+    savedFilterNavigationRef.current = savedNavigation
 
     // Restore smart insight temp filter from URL (e.g. on page reload)
     // Insight IDs are strings (e.g. 'overdue'), saved filter IDs are numeric
@@ -742,12 +758,9 @@ const MyChores = () => {
     if (!chores.length || !savedFilters.length) return
 
     // Handle advanced filter parameter
-    if (filterId && !activeFilterId) {
-      const filter = savedFilters.find(f => f.id === filterId)
-      if (filter) {
-        applyCustomFilter(filterId)
-        return
-      }
+    if (savedNavigation.filterIdToApply !== null) {
+      applyCustomFilter(savedNavigation.filterIdToApply)
+      return
     }
 
     // Handle legacy filter parameter (e.g., filter=unplanned)
@@ -773,7 +786,10 @@ const MyChores = () => {
     chores,
     hasQuickFilters,
     activeFilterId,
+    tempFilter,
     savedFilters,
+    filtersStatus,
+    filtersFetchStatus,
     membersData,
     applyCustomFilter,
     applyTempFilter,
@@ -790,7 +806,9 @@ const MyChores = () => {
   useEffect(() => {
     const insightId = tempFilterMeta?.id
     const params = new URLSearchParams(searchParams)
-    const currentFilterId = params.get('filterId')
+    const currentFilterId = params.get('filterId') || params.get('filter_id')
+
+    if (savedFilterNavigationRef.current.pending) return
 
     // URL → state takes one render. During that render `tempFilterMeta` still
     // describes the previously selected person/insight; writing it to the URL
@@ -823,7 +841,7 @@ const MyChores = () => {
         { replace: true },
       )
     }
-  }, [tempFilterMeta?.id, searchParams])
+  }, [activeFilterId, tempFilterMeta?.id, searchParams])
 
   const {
     handleAssigneeChange,
